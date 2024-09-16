@@ -10,8 +10,11 @@
     />
     <link rel="stylesheet" href="style.css" />
   </head>
+
   <body>
     <div class="container">
+      <div id="toast" class="toast"></div>
+      <button id="logout">Logout</button>
       <div class="stats-container">
         <div class="details">
           <h1>Todo App</h1>
@@ -24,14 +27,15 @@
           <p id="numbers">0 / 0</p>
         </div>
       </div>
-      <form> 
+      <form>
         <input type="text" placeholder="Enter Your Task" id="taskInput" />
         <button type="submit" id="newTask">+</button>
       </form>
-      <ul id="task-list"></ul>
+      <ul id="task-list">
+        <div class="loader"></div>
+        <div class="loadingText"></div>
+      </ul>
     </div>
-
-
     <script src="script.js" type="module"></script>
   </body>
 </html>

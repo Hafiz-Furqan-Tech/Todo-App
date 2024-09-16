@@ -3,28 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signup Form</title>
+    <title>Login Form</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <section>
-      <div class="signup-box">
-        <form id="form">
-          <h2>Signup</h2>
-          <div class="input-box">
-            <span class="icon"
-              ><ion-icon name="person-outline"></ion-icon
-            ></span>
-            <input type="text" id="first-name" required />
-            <label>First Name</label>
-          </div>
-          <div class="input-box">
-            <span class="icon"
-              ><ion-icon name="person-outline"></ion-icon
-            ></span>
-            <input type="text" id="last-name" required />
-            <label>Last Name</label>
-          </div>
+      <div class="Login-box">
+        <form>
+          <h2>Login</h2>
           <div class="input-box">
             <span class="icon"><ion-icon name="mail"></ion-icon></span>
             <input type="email" id="email" required />
@@ -38,11 +24,13 @@
           <div class="errormsg">
             <p id="error-msg"></p>
           </div>
-          <button type="submit">Submit</button>
+          <div class="btn">
+            <button type="submit" id="btn">Login</button>
+          </div>
           <div class="register-link">
             <p>
-              Already have an account?
-              <a href="../login/index.html">login</a>
+              Don't Have an Account?
+              <a href="../signup/signup.html">Signup</a>
             </p>
           </div>
         </form>
@@ -57,6 +45,6 @@
       type="module"
       src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
     ></script>
-    <script src="signup.js" type="module"></script>
+    <script src="login.js" type="module"></script>
   </body>
 </html>

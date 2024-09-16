@@ -1,167 +1,232 @@
 import {
-  db,
+  auth,
+  signOut,
+  addDoc,
   collection,
+  db,
   query,
   where,
   getDocs,
-  addDoc,
-  deleteDoc,
+  onAuthStateChanged,
   doc,
   updateDoc,
-  auth,
+  deleteDoc,
+  orderBy,
 } from "./firebase/Firebase.js";
 
-// Local tasks array to manage state
-let tasks = [];
-let editingTaskId = null;
+try {
+  const loader = document.querySelector(".loader");
+  const loadingText = document.querySelector(".loadingText");
 
-// Fetch tasks for logged-in user
-const fetchTasksFromFirebase = async () => {
-  const user = auth.currentUser;
-  if (user) {
-    const q = query(collection(db, "Tasks"), where("uid", "==", user.uid));
-    const querySnapshot = await getDocs(q);
-    tasks = []; // Empty the array before refilling
-    querySnapshot.forEach((doc) => {
-      tasks.push({ id: doc.id, ...doc.data() });
-    });
-    updateTaskList();
-    updateStats();
-  }
-};
-
-// Add new task
-const addTask = async () => {
-  const taskInput = document.getElementById("taskInput");
-  const text = taskInput.value.trim();
-  const user = auth.currentUser;
-
-  if (text && user) {
-    if (editingTaskId) {
-      await updateTaskFirebase(editingTaskId, text);
-    } else {
-      await addTaskFirebase(text, user.uid);
-    }
-    taskInput.value = ""; // Clear the input field
-    editingTaskId = null; // Reset after editing
-  }
-  updateTaskList();
-  updateStats();
-};
-
-// Add task to Firestore with user ID
-async function addTaskFirebase(text, uid) {
-  try {
-    const docRef = await addDoc(collection(db, "Tasks"), {
-      text: text,
-      completed: false,
-      uid: uid, // Store user ID with task
-    });
-    tasks.push({ id: docRef.id, text: text, completed: false });
-  } catch (e) {
-    console.error("Error adding document: ", e);
-  }
-}
-
-// Update task in Firestore (for editing)
-async function updateTaskFirebase(id, text) {
-  try {
-    const taskRef = doc(db, "Tasks", id);
-    await updateDoc(taskRef, { text: text });
-    tasks = tasks.map((task) => (task.id === id ? { ...task, text } : task));
-  } catch (e) {
-    console.error("Error updating document: ", e);
-  }
-}
-
-// Delete task from Firestore and local state
-const deleteTask = async (id) => {
-  try {
-    await deleteDoc(doc(db, "Tasks", id));
-    tasks = tasks.filter((task) => task.id !== id);
-    updateTaskList();
-    updateStats();
-  } catch (e) {
-    console.error("Error deleting document: ", e);
-  }
-};
-
-// Toggle task completion and update Firestore
-const toggleTaskComplete = async (index) => {
-  tasks[index].completed = !tasks[index].completed;
-  const taskRef = doc(db, "Tasks", tasks[index].id);
-  await updateDoc(taskRef, { completed: tasks[index].completed });
-  updateTaskList();
-  updateStats();
-};
-
-// Edit task (load into input field without removing from list)
-const editTask = (index) => {
-  const taskInput = document.getElementById("taskInput");
-  taskInput.value = tasks[index].text;
-  editingTaskId = tasks[index].id; // Set editing task ID
-};
-
-// Update Stats (Progress Bar and Numbers)
-const updateStats = () => {
-  const completedTasks = tasks.filter((task) => task.completed).length;
-  const totalTasks = tasks.length;
-  const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const logout = document.querySelector("#logout");
+  const form = document.querySelector("form");
+  const taskList = document.querySelector("#task-list");
   const progressBar = document.getElementById("progress");
+  const numbers = document.getElementById("numbers");
+  const taskInput = form["taskInput"];
+  const taskCollection = collection(db, "Tasks");
 
-  progressBar.style.width = `${progress}%`;
-  document.getElementById(
-    "numbers"
-  ).innerText = `${completedTasks} / ${totalTasks}`;
-};
+  let tasks = [];
 
-// Update Task List in UI
-// Update Task List in UI
-const updateTaskList = () => {
-  const taskList = document.getElementById("task-list");
-  taskList.innerHTML = "";
-
-  tasks.forEach((task, index) => {
-    const listItem = document.createElement("li");
-    listItem.innerHTML = `
-      <div class="taskItem">
-        <div class="task ${task.completed ? "completed" : ""}">
-          <input type="checkbox" class="checkbox" ${
-            task.completed ? "checked" : ""
-          }/>
-          <p>${task.text}</p>
-        </div>
-        <div class="icons">
-          <img src="./images/icons8-edit-26.png" class="editTask" />
-          <img src="images/icons8-delete-26 (1).png" class="deleteTask" />
-        </div>
-      </div>`;
-
-    // Append the list item to the task list
-    taskList.appendChild(listItem);
-
-    // Add event listeners for edit and delete icons
-    listItem
-      .querySelector(".editTask")
-      .addEventListener("click", () => editTask(index));
-    listItem
-      .querySelector(".deleteTask")
-      .addEventListener("click", () => deleteTask(task.id));
-    listItem
-      .querySelector(".checkbox")
-      .addEventListener("change", () => toggleTaskComplete(index));
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      getDataFirebase();
+    } else {
+      loader.style.display = "none";
+      loadingText.style.display = "none";
+      window.location.href = "./auth/login/login.html";
+    }
   });
-};
 
-// Add Task on Submit
-document.getElementById("newTask").addEventListener("click", function (e) {
-  e.preventDefault();
-  addTask();
-});
+  function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.classList.add("show");
 
-// Fetch tasks when the page loads
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    fetchTasksFromFirebase();
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2000);
   }
-});
+
+  logout.addEventListener("click", handleLogout);
+  form.addEventListener("submit", handleAddOrUpdateTask);
+  function handleLogout() {
+    showToast("Logging out...");
+    signOut(auth)
+      .then(() => {
+        showToast("Logged out successfully");
+        setTimeout(() => {
+          window.location.href = "./auth/login/login.html";
+        }, 2000);
+      })
+      .catch((error) => {
+        console.error("Error during logout: ", error);
+        showToast("Error during logout");
+      });
+  }
+
+  async function handleAddOrUpdateTask(event) {
+    event.preventDefault();
+
+    const taskText = taskInput.value.trim();
+    const editId = form.getAttribute("data-edit-id");
+
+    if (taskText === "") return showToast("Please Enter a Task");
+
+    if (editId) {
+      const taskRef = doc(db, "Tasks", editId);
+      await updateDoc(taskRef, {
+        text: taskText,
+        timeStamp: new Date().toLocaleTimeString(),
+      });
+      form.removeAttribute("data-edit-id");
+    } else {
+      const user = auth.currentUser;
+      if (user) {
+        showToast("Task Adding");
+        await addDoc(taskCollection, {
+          text: taskText,
+          completed: false,
+          uid: user.uid,
+          timeStamp: new Date().toLocaleTimeString(),
+        });
+        showToast("task added");
+      }
+    }
+
+    taskInput.value = "";
+    getDataFirebase();
+  }
+
+  async function getDataFirebase() {
+    const user = auth.currentUser;
+
+    if (user) {
+      loader.style.display = "block";
+      loadingText.style.display = "block";
+      const q = query(
+        taskCollection,
+        where("uid", "==", user.uid),
+        orderBy("timeStamp", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      tasks = [];
+      taskList.innerHTML = "";
+
+      querySnapshot.forEach((doc) => {
+        const taskData = doc.data();
+
+        tasks.push({ id: doc.id, ...taskData });
+
+        const listItem = document.createElement("li");
+        listItem.innerHTML = `
+            <div class="taskItem">
+              <div class="task ${taskData.completed ? "completed" : ""}">
+                <input type="checkbox" class="checkbox" ${
+                  taskData.completed ? "checked" : ""
+                } />
+                <p>${taskData.text}</p>
+              </div>
+              <div class="img">
+                <img src="./images/icons8-edit-26.png" class="editTask" data-id="${
+                  doc.id
+                }" data-text="${taskData.text}" />
+                <img src="./images/icons8-delete-26 (1).png" class="deleteTask" data-id="${
+                  doc.id
+                }" />
+              </div>
+            </div>`;
+        taskList.appendChild(listItem);
+      });
+
+      loader.style.display = "none";
+      loadingText.style.display = "none";
+      updateStats();
+      addEventListenersToTasks();
+    }
+  }
+
+  function updateStats() {
+    const completedTasks = tasks.filter((task) => task.completed).length;
+    const totalTasks = tasks.length;
+    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    progressBar.style.width = `${progress}%`;
+    numbers.innerText = `${completedTasks} / ${totalTasks}`;
+  }
+
+  function addEventListenersToTasks() {
+    const deleteButtons = document.querySelectorAll(".deleteTask");
+    const editButtons = document.querySelectorAll(".editTask");
+    const checkboxes = document.querySelectorAll(".checkbox");
+
+    deleteButtons.forEach((button) => {
+      button.addEventListener("click", (e) => deleteTask(e.target.dataset.id));
+    });
+
+    editButtons.forEach((button) => {
+      button.addEventListener("click", (e) =>
+        editTask(e.target.dataset.id, e.target.dataset.text)
+      );
+    });
+
+    checkboxes.forEach((checkbox, index) => {
+      checkbox.addEventListener("change", () => toggleTaskComplete(index));
+    });
+  }
+
+  async function deleteTask(taskId) {
+    const taskRef = doc(db, "Tasks", taskId);
+    showToast("Task Deleting...");
+    await deleteDoc(taskRef);
+    getDataFirebase();
+    showToast("Task Deleted");
+  }
+
+  function editTask(taskId, taskText) {
+    taskInput.value = taskText;
+    form.setAttribute("data-edit-id", taskId);
+    showToast("Editing Task...");
+  }
+
+  function toggleTaskComplete(index) {
+    tasks[index].completed = !tasks[index].completed;
+    const taskRef = doc(db, "Tasks", tasks[index].id);
+    updateDoc(taskRef, { completed: tasks[index].completed }).then(() => {
+      updateTaskList();
+      updateStats();
+      showToast(
+        tasks[index].completed ? "Task Completed" : "Task Marked Incomplete"
+      );
+    });
+  }
+
+  function updateTaskList() {
+    taskList.innerHTML = "";
+    tasks.forEach((task, index) => {
+      const listItem = document.createElement("li");
+      listItem.innerHTML = `
+          <div class="taskItem">
+            <div class="task ${task.completed ? "completed" : ""}">
+              <input type="checkbox" class="checkbox" ${
+                task.completed ? "checked" : ""
+              } />
+                <p>${task.text}</p>
+              </div>
+            <div class="img">
+              <img src="./images/icons8-edit-26.png" class="editTask" data-id="${
+                task.id
+              }" data-text="${task.text}" />
+              <img src="./images/icons8-delete-26 (1).png" class="deleteTask" data-id="${
+                task.id
+              }" />
+            </div>
+          </div>`;
+
+      taskList.appendChild(listItem);
+    });
+    addEventListenersToTasks();
+  }
+} catch (error) {
+  console.log(error);
+}

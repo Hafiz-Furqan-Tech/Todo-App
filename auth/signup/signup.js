@@ -29,43 +29,48 @@ const validateForm = () => {
 
   return isValid;
 };
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
 
-  if (!validateForm()) {
-    btn.innerText = "Submit";
-    btn.disabled = false;
-    return;
-  }
+try {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  btn.disabled = true;
-  btn.innerText = "Please wait...";
-  const email = form["email"].value;
-  const password = form["password"].value;
-  const fName = form["first-name"].value;
-  const lName = form["last-name"].value;
-
-  createUserWithEmailAndPassword(auth, email, password)
-    .then(async (userCredential) => {
-      const user = userCredential.user;
-      try {
-        const docRef = await addDoc(collection(db, "users"), {
-          uid: user.uid,
-          fName: fName,
-          lName: lName,
-          email: email,
-          timestamp: new Date(),
-        });
-        console.log("User document added with ID: ", docRef.id);
-      } catch (error) {
-        console.log("Error adding document: ", error);
-      }
-      btn.innerText = "Sign Up";
+    if (!validateForm()) {
+      btn.innerText = "Submit";
       btn.disabled = false;
-    })
-    .catch((error) => {
-      error_msg.innerText = error.message;
-      btn.innerText = "Sign Up";
-      btn.disabled = false;
-    });
-});
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "Please wait...";
+    const email = form["email"].value;
+    const password = form["password"].value;
+    const fName = form["first-name"].value;
+    const lName = form["last-name"].value;
+
+    createUserWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        const user = userCredential.user;
+        try {
+          await addDoc(collection(db, "users"), {
+            uid: user.uid,
+            fName: fName,
+            lName: lName,
+            email: email,
+            timestamp: new Date(),
+          });
+        } catch (error) {
+          console.log("Error adding document: ", error);
+        }
+        btn.innerText = "Sign Up";
+        btn.disabled = false;
+        window.location.href = "../login/login.html";
+      })
+      .catch((error) => {
+        error_msg.innerText = error.message;
+        btn.innerText = "Sign Up";
+        btn.disabled = false;
+      });
+  });
+} catch (error) {
+  console.log(error);
+}
