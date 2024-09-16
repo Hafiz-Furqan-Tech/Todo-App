@@ -68,21 +68,25 @@ try {
   async function handleAddOrUpdateTask(event) {
     event.preventDefault();
 
+    const taskBtn = form["newTask"];
     const taskText = taskInput.value.trim();
     const editId = form.getAttribute("data-edit-id");
 
     if (taskText === "") return showToast("Please Enter a Task");
 
     if (editId) {
+      taskBtn.disabled = true;
       const taskRef = doc(db, "Tasks", editId);
       await updateDoc(taskRef, {
         text: taskText,
         timeStamp: new Date().toLocaleTimeString(),
       });
       form.removeAttribute("data-edit-id");
+      taskBtn.disabled = false;
     } else {
       const user = auth.currentUser;
       if (user) {
+        taskBtn.disabled = true;
         showToast("Task Adding");
         await addDoc(taskCollection, {
           text: taskText,
@@ -91,6 +95,7 @@ try {
           timeStamp: new Date().toLocaleTimeString(),
         });
         showToast("task added");
+        taskBtn.disabled = false;
       }
     }
 
